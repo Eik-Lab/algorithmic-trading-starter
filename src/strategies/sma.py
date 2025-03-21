@@ -1,6 +1,6 @@
 from typing import Dict, Any, Tuple, Optional, List
 import numpy as np
-from src.strategy import Strategy, Position, Order
+from strategy import Strategy, Position, Order
 
 
 class SMAStrategy(Strategy):
