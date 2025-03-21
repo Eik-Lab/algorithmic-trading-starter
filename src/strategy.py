@@ -1,6 +1,7 @@
 from abc import ABC, abstractmethod
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, Tuple
 from enum import Enum
+from dataclasses import dataclass
 
 
 class Position(Enum):
@@ -8,6 +9,14 @@ class Position(Enum):
     LONG = "long"
     SHORT = "short"
     NEUTRAL = "neutral"
+
+
+@dataclass
+class Order:
+    """Class representing a trading order."""
+    price: float
+    quantity: float
+    direction: Position
 
 
 class Strategy(ABC):
@@ -27,11 +36,10 @@ class Strategy(ABC):
         """
         self.name = name
         self.position = Position.NEUTRAL
-        # TODO: Consider adding these into the class
-        # self.position_size = 0.0
-        # self.entry_price = 0.0
-        # self.stop_loss = 0.0
-        # self.take_profit = 0.0
+        self.position_size = 0.0
+        self.entry_price = 0.0
+        self.stop_loss = 0.0
+        self.take_profit = 0.0
     
     @abstractmethod
     def update(self, data: Dict[str, Any]) -> None:
@@ -40,6 +48,70 @@ class Strategy(ABC):
         
         Args:
             data: Dictionary containing market data
+        """
+        pass
+    
+    @abstractmethod
+    def generate_signal(self, data: Dict[str, Any]) -> Tuple[Position, float]:
+        """
+        Analyze market data and determine whether to go long, short, or stay neutral.
+        
+        Args:
+            data: Dictionary containing market data
+            
+        Returns:
+            A tuple containing the position signal (LONG, SHORT, or NEUTRAL) and the signal strength (0.0 to 1.0)
+        """
+        pass
+    
+    def execute_strategy(self, data: Dict[str, Any]) -> Optional[Order]:
+        """
+        This method provides a blanket implementation. Feel free to override.
+        Execute the strategy based on the current market data.
+        
+        This method calls generate_signal() to determine the position,
+        then executes an action based on the signal.
+        
+        Args:
+            data: Dictionary containing market data
+            
+        Returns:
+            An Order object if a trade is executed, None otherwise
+        """
+        signal, strength = self.generate_signal(data)
+        # Should probably throw an error? 
+        current_price = data.get('price', 0.0)
+        
+        # Determine position size based on signal strength
+        size = self.calculate_position_size(strength)
+        
+        if signal == Position.LONG and self.position != Position.LONG:
+            if self.position == Position.SHORT:
+                self.close()
+            self.long(size, current_price)
+            return Order(price=current_price, quantity=size, direction=Position.LONG)
+            
+        elif signal == Position.SHORT and self.position != Position.SHORT:
+            if self.position == Position.LONG:
+                self.close()
+            self.short(size, current_price)
+            return Order(price=current_price, quantity=size, direction=Position.SHORT)
+            
+        elif signal == Position.NEUTRAL and self.position != Position.NEUTRAL:
+            self.close()
+            return Order(price=current_price, quantity=self.position_size, direction=Position.NEUTRAL)
+            
+        return None
+    
+    def calculate_position_size(self, signal_strength: float) -> float:
+        """
+        Calculate the position size based on signal strength.
+        
+        Args:
+            signal_strength: A value between 0.0 and 1.0 indicating the strength of the signal
+            
+        Returns:
+            The position size to use
         """
         pass
     
@@ -55,7 +127,12 @@ class Strategy(ABC):
             stop_loss: Optional stop loss price
             take_profit: Optional take profit price
         """
-        pass
+        self.position = Position.LONG
+        self.position_size = size
+        self.entry_price = entry_price
+        self.stop_loss = stop_loss
+        self.take_profit = take_profit
+        print(f"LONG: Size={size}, Entry={entry_price}, SL={stop_loss}, TP={take_profit}")
     
     def short(self, size: float, entry_price: float, 
               stop_loss: Optional[float] = None, 
@@ -70,7 +147,7 @@ class Strategy(ABC):
             take_profit: Optional take profit price
         """
         pass
-    
+           
     def close(self) -> None:
         """Close the current position."""
         pass
@@ -82,7 +159,8 @@ class Strategy(ABC):
         Args:
             new_stop_loss: New stop loss price
         """
-        pass
+        self.stop_loss = new_stop_loss
+        print(f"ADJUSTED SL: New stop loss = {new_stop_loss}")
     
     def adjust_take_profit(self, new_take_profit: float) -> None:
         """
@@ -91,5 +169,14 @@ class Strategy(ABC):
         Args:
             new_take_profit: New take profit price
         """
-        pass
+        self.take_profit = new_take_profit
+        print(f"ADJUSTED TP: New take profit = {new_take_profit}")
+    
+    def is_in_position(self) -> bool:
+        """Check if the strategy is currently in a position."""
+        return self.position != Position.NEUTRAL
+    
+    def get_position(self) -> Position:
+        """Get the current position state."""
+        return self.position
     
