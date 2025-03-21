@@ -112,14 +112,18 @@ class AlpacaTrader:
         # self.data_stream.subscribe_bars(self._handle_bar_update, *self.symbols)
         
         # Start the websocket connection
-        await self.data_stream.run()
+        # Don't use await here as it tries to create a new event loop
+        self.data_stream._ws_conn = self.data_stream._connect()
+        self.data_stream._running = True
         
         logger.info(f"Data stream set up for symbols: {self.symbols}")
     
     async def _load_historical_data(self):
         """Load historical data to initialize strategies."""
         end = datetime.now()
+        end = end - timedelta(days=0.8)
         start = end - timedelta(days=30)  # Get 30 days of data
+        logger.info("Fetching historical data for the last 30 days")
         
         for symbol in self.symbols:
             request_params = StockBarsRequest(
@@ -150,7 +154,7 @@ class AlpacaTrader:
                     
                 logger.info(f"Loaded {len(df)} historical bars for {symbol}")
     
-    def _handle_trade_update(self, trade):
+    async def _handle_trade_update(self, trade):
         """
         Handle real-time trade updates.
         
@@ -177,7 +181,7 @@ class AlpacaTrader:
         # Check if we need to execute any orders
         self._check_and_execute_orders(symbol)
     
-    def _check_and_execute_orders(self, symbol: str):
+    async def _check_and_execute_orders(self, symbol: str):
         """
         Check if we need to execute any orders based on strategy signals.
         
@@ -250,9 +254,15 @@ class AlpacaTrader:
 
 async def main():
     """Main function to run the live trading system."""
-    # Replace with your Alpaca API credentials
-    API_KEY = "PKFZ8LQ6OIIT9C86KM87"
-    API_SECRET = "vqCzwadxt8kTGXVB7aQcS19MsTi6kF4wOPVT1ZQM"
+    # Get API keys from environment variables
+    import os
+    API_KEY = os.environ.get('ALPACA_API_KEY')
+    API_SECRET = os.environ.get('ALPACA_API_SECRET')
+    
+    if not API_KEY or not API_SECRET:
+        logger.error("Alpaca API credentials not found in environment variables.")
+        logger.error("Please set ALPACA_API_KEY and ALPACA_API_SECRET environment variables.")
+        return
     
     # Initialize the Alpaca trader
     trader = AlpacaTrader(
@@ -263,9 +273,19 @@ async def main():
         timeframe=TimeFrame.Day
     )
     
-    # Add a strategy
+    # Add a strategy based on the command line argument
+    # This will be determined by the main.py file
     from strategies.rsa import RSAStrategy
-    strategy = RSAStrategy(name="RSA_Live", window_size=20)
+    from strategies.sma import SMAStrategy
+    
+    # Default to RSA strategy
+    strategy_name = os.environ.get('STRATEGY', 'rsa')
+    
+    if strategy_name.lower() == 'sma':
+        strategy = SMAStrategy(name="SMA_Live")
+    else:
+        strategy = RSAStrategy(name="RSA_Live")
+        
     trader.add_strategy(strategy)
     
     try:
@@ -280,6 +300,8 @@ async def main():
 
 
 if __name__ == "__main__":
-    # Run the main function
-    asyncio.run(main())
+    # Run the main function directly
+    # This should only be used when running this file directly
+    loop = asyncio.get_event_loop()
+    loop.run_until_complete(main())
 

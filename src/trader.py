@@ -7,7 +7,14 @@ class Trader:
     Trader class responsible for executing trades based on strategy signals.
     
     This class handles the interaction between trading strategies and the market,
-    managing execution, position tracking, and performance monitoring.
+    managing execution, position tracking, and performance monitoring. It serves
+    as the central component that coordinates multiple strategies, tracks their
+    positions, and maintains the overall portfolio.
+    
+    The Trader maintains a record of all trades, calculates performance metrics,
+    and handles the accounting aspects of trading including commissions, P&L
+    calculation, and capital management. It can work with both backtesting and
+    live trading implementations.
     """
     
     def __init__(self, initial_capital: float = 10000.0):
