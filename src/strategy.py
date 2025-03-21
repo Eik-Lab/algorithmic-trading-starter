@@ -40,6 +40,10 @@ class Strategy(ABC):
         self.entry_price = 0.0
         self.stop_loss = 0.0
         self.take_profit = 0.0
+        
+        # For live trading order management
+        self.order_pending = False
+        self.pending_order = None
     
     @abstractmethod
     def update(self, data: Dict[str, Any]) -> None:
@@ -89,17 +93,26 @@ class Strategy(ABC):
             if self.position == Position.SHORT:
                 self.close()
             self.long(size, current_price)
-            return Order(price=current_price, quantity=size, direction=Position.LONG)
+            order = Order(price=current_price, quantity=size, direction=Position.LONG)
+            self.order_pending = True
+            self.pending_order = order
+            return order
             
         elif signal == Position.SHORT and self.position != Position.SHORT:
             if self.position == Position.LONG:
                 self.close()
             self.short(size, current_price)
-            return Order(price=current_price, quantity=size, direction=Position.SHORT)
+            order = Order(price=current_price, quantity=size, direction=Position.SHORT)
+            self.order_pending = True
+            self.pending_order = order
+            return order
             
         elif signal == Position.NEUTRAL and self.position != Position.NEUTRAL:
             self.close()
-            return Order(price=current_price, quantity=self.position_size, direction=Position.NEUTRAL)
+            order = Order(price=current_price, quantity=self.position_size, direction=Position.NEUTRAL)
+            self.order_pending = True
+            self.pending_order = order
+            return order
             
         return None
     
